@@ -343,15 +343,33 @@ SYSTEMTIME GetSystemCurrentTime ()
 	GetLocalTime (&st);
 	return st;
 }
-std::wstring GetTimestampForFileName (const SYSTEMTIME &current = GetSystemCurrentTime ())
+std::wstring GetTimestampForFileName (const std::wstring &format = L"%d%02d%02d%02d%02d%02d", const SYSTEMTIME &current = GetSystemCurrentTime ())
 {
 	WCHAR buf [128] = {0};
-	swprintf (buf, L"%d%02d%02d%02d%02d%02d",
+	swprintf (buf, format.c_str (),
 		current.wYear, current.wMonth, current.wDay,
-		current.wHour, current.wMinute, current.wSecond
+		current.wHour, current.wMinute, current.wSecond,
+		current.wMilliseconds
 	);
 	return buf;
 }
+
+std::wstring GenerateRandomFileName (int length = 12)
+{
+	static const wchar_t charset [] = L"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+	const int charsetSize = sizeof (charset) / sizeof (charset [0]) - 1;
+	std::wstring result;
+	result.reserve (length);
+	srand ((unsigned int)(GetTickCount64 () ^ GetCurrentProcessId () ^ time (NULL)));
+	for (int i = 0; i < length; ++i)
+	{
+		int index = rand () % charsetSize;
+		result += charset [index];
+	}
+	return result;
+}
+
+std::wstring GetTempFileNameW () { return GetTimestampForFileName (L"%d%02d%02d%02d%02d%02d.%03d") + GenerateRandomFileName (6) + L".tmp"; }
 
 HRESULT CreateBundlePackageFile (const std::vector <std::wstring> &swaPkgFileList, const std::wstring &lpOutputDir, std::wstring &pswOutputFilePath, UINT64 u64Version = 0, std::wstring &lpOutputName = std::wstring (L""), bool bNameByPFN = true, std::function <void (int finished, int total, int progress)> fCallback = nullptr, IODIRECTION &ioDirector = IODirection ())
 {
@@ -366,7 +384,7 @@ HRESULT CreateBundlePackageFile (const std::vector <std::wstring> &swaPkgFileLis
 	if (std::wnstring::empty (lpOutputName))
 	{
 		WCHAR buf [MAX_PATH + 1] = {0};
-		GetTempFileNameW (nullptr, L"TMP", 0, buf);
+		lstrcpyW (buf, GetTempFileNameW ().c_str ());
 		PathRemoveExtensionW (buf);
 		lpOutputName = PathFindFileNameW (buf);
 	}

@@ -14,6 +14,8 @@
 #include <thread>
 #include <wincrypt.h>
 #include <fmt/format.h>
+#include <Psapi.h>
+#include "heap.h"
 #include "module.h"
 #include "pkgread.h"
 #include "pkgwrite.h"
@@ -362,11 +364,11 @@ void SetListContent (HWND hList, const std::vector <std::wstring> &columnNames, 
 	ListView_DeleteAllItems (hList);
 	AddListContent (hList, columnNames, data);
 }
-std::vector <uint64_t> GetSelectedItemValue (HWND hListView)
+size_t GetSelectedItemValue (HWND hListView, std::vector <uint64_t> &result)
 {
-	std::vector <uint64_t> result;
+	result.clear ();
 	int count = ListView_GetSelectedCount (hListView);
-	if (count <= 0) return result;
+	if (count <= 0) return result.size ();
 	int iItem = -1;
 	for (int i = 0; i < count; ++ i)
 	{
@@ -380,11 +382,11 @@ std::vector <uint64_t> GetSelectedItemValue (HWND hListView)
 			result.push_back ((uint64_t)item.lParam);
 		}
 	}
-	return result;
+	return result.size ();
 }
-std::vector <int64_t> GetListSelectedCount (HWND hList)
+size_t GetListSelectedCount (HWND hList, std::vector <int64_t> &selectedIndices)
 {
-	std::vector<int64_t> selectedIndices;
+	selectedIndices.clear ();
 	wchar_t className [64] = {0};
 	GetClassNameW (hList, className, 63);
 	if (wcscmp (className, L"SysListView32") == 0)
@@ -414,13 +416,13 @@ std::vector <int64_t> GetListSelectedCount (HWND hList)
 	else
 	{
 	}
-	return selectedIndices;
+	return selectedIndices.size ();
 }
-std::vector <uint64_t> GetCheckedItemValue (HWND hListView)
+size_t GetCheckedItemValue (HWND hListView, std::vector <uint64_t> &result)
 {
-	std::vector <uint64_t> result;
+	result.clear ();
 	int count = ListView_GetItemCount (hListView);
-	if (count <= 0) return result;
+	if (count <= 0) return result.size ();
 	for (int i = 0; i < count; ++ i)
 	{
 		if (ListView_GetCheckState (hListView, i))
@@ -435,7 +437,7 @@ std::vector <uint64_t> GetCheckedItemValue (HWND hListView)
 		}
 	}
 
-	return result;
+	return result.size ();
 }
 size_t GetListViewItemRow (HWND hList, int index, std::vector <std::wstring> &row)
 {
@@ -537,9 +539,9 @@ template <typename T> size_t MergeVectorsKeepSame (const std::vector <std::vecto
 	return result.size ();
 }
 static std::wstring lastfile = L"";
-std::vector <std::wstring> ExploreFile (HWND hParent, LPWSTR lpFilter = L"Windows Store App Package (*.appx)\0*.appx", DWORD dwFlags = OFN_EXPLORER | OFN_ALLOWMULTISELECT | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST, const std::wstring &swWndTitle = std::wstring (L"Please select the file(-s): "), const std::wstring &swInitDir = GetFileDirectoryW (lastfile))
+size_t ExploreFile (HWND hParent, std::vector <std::wstring> &results, LPWSTR lpFilter = L"Windows Store App Package (*.appx)\0*.appx", DWORD dwFlags = OFN_EXPLORER | OFN_ALLOWMULTISELECT | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST, const std::wstring &swWndTitle = std::wstring (L"Please select the file(-s): "), const std::wstring &swInitDir = GetFileDirectoryW (lastfile))
 {
-	std::vector<std::wstring> results;
+	results.clear ();
 	const DWORD BUFFER_SIZE = 65536; // 64KB
 	std::vector <WCHAR> buffer (BUFFER_SIZE, 0);
 	OPENFILENAME ofn;
@@ -570,7 +572,7 @@ std::vector <std::wstring> ExploreFile (HWND hParent, LPWSTR lpFilter = L"Window
 		}
 		if (!results.empty ()) lastfile = results.back ();
 	}
-	return results;
+	return results.size ();
 }
 int CALLBACK BrowseCallbackProc (HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
 {
@@ -609,12 +611,10 @@ static std::vector <std::wstring> thead = {
 	GetRCStringSW (IDS_THEAD_PKGRES),
 	GetRCStringSW (IDS_THEAD_RESVALUE)
 };
-std::vector <std::wstring> GetTableRowFromPackage (const std::wstring &filepath)
+size_t GetTableRowFromPackage (const std::wstring &filepath, std::vector <std::wstring> &row)
 {
-	std::vector<std::wstring> row;
 	package_info inf (filepath);
-	if (!inf.is_valid)
-		return row;
+	if (!inf.is_valid) return row.size ();
 	row.push_back (PathFindFileNameW (filepath.c_str ()));
 	{
 		std::vector <WCHAR> buf (filepath.size () + 1);
@@ -736,7 +736,7 @@ std::vector <std::wstring> GetTableRowFromPackage (const std::wstring &filepath)
 		break;
 	}
 
-	return row;
+	return row.size ();
 }
 #define ARRTS_DIV_RIGHT_SPACE    0x00000001  // 成员分割符右侧有空格 ", "
 #define ARRTS_DIV_LEFT_SPACE     0x00000002  // 成员分割符左侧有空格 " ,"
@@ -836,13 +836,11 @@ namespace selfns
 		return result;
 	}
 };
-std::vector <std::wnstring> GetPackageInfoForDisplay (const std::wstring &filepath)
+size_t GetPackageInfoForDisplay (const std::wstring &filepath, std::vector <std::wnstring> &vec)
 {
-	std::vector <std::wnstring> vec;
-	vec.reserve (8);
+	vec.clear ();
 	package_info inf (filepath);
-	if (!inf.is_valid)
-		return vec;
+	if (!inf.is_valid) return vec.size ();
 	vec.push_back (filepath);
 	vec.push_back (inf.identity.name);
 	vec.push_back (inf.identity.publisher);
@@ -1013,7 +1011,7 @@ std::vector <std::wnstring> GetPackageInfoForDisplay (const std::wstring &filepa
 		break;
 	}
 
-	return vec;
+	return vec.size ();
 }
 static void EnsureRichEditLoaded ()
 {
@@ -1195,15 +1193,16 @@ void SetCheckboxState (HWND hCheckbox, BOOL checked)
 }
 std::wstring GetWindowTextW (HWND hWnd)
 {
+	static HANDLE hHeap = HeapCreate (0, 0, 0);
+	if (!hHeap) return L"";
 	int len = GetWindowTextLengthW (hWnd);
-	if (len > 0)
-	{
-		auto buf = std::make_unique <WCHAR []> (len + 1);
-		ZeroMemory (buf.get (), sizeof (WCHAR) * (len + 1));
-		GetWindowTextW (hWnd, buf.get (), len + 1);
-		return std::wstring () + buf.get ();
-	}
-	return L"";
+	if (len <= 0) return L"";
+	WCHAR *buf = (WCHAR *)HeapAlloc (hHeap, HEAP_ZERO_MEMORY, sizeof (WCHAR) * (len + 1));
+	raii heapReleaser ([buf] () {
+		if (buf) HeapFree (hHeap, 0, buf);
+	});
+	if (GetWindowTextW (hWnd, buf, len + 1) == 0) return L"";
+	return std::wstring (buf);
 }
 ITaskbarList3 *g_pTaskbarList = NULL;
 void InvokeSetWndEnable (HWND hParent, HWND hWnd, bool bEnable);
@@ -1246,22 +1245,34 @@ bool CheckTestPositiveInteger (const std::wstring &t)
 }
 std::wstring FormatTime (const std::wstring &fmt = L"HH:mm:ss", const SYSTEMTIME &st = GetSystemCurrentTime ())
 {
-	size_t size = GetTimeFormatW (LOCALE_USER_DEFAULT, 0, &st, NULL, NULL, 0);
-	auto buf = std::make_unique <WCHAR []> (size + 1);
-	GetTimeFormatW (LOCALE_USER_DEFAULT, 0, &st, NULL, buf.get (), size);
-	return std::wstring () + buf.get ();
+	static HANDLE hHeap = HeapCreate (0, 0, 0); 
+	if (!hHeap) return L"";
+	size_t size = GetTimeFormatW (LOCALE_USER_DEFAULT, 0, &st, fmt.c_str (), NULL, 0);
+	if (size == 0) return L"";
+	WCHAR* buf = (WCHAR*)HeapAlloc (hHeap, HEAP_ZERO_MEMORY, sizeof (WCHAR) * (size + 1));
+	raii heapReleaser ([buf] () {
+		if (buf) HeapFree (hHeap, 0, buf);
+	});
+	if (GetTimeFormatW (LOCALE_USER_DEFAULT, 0, &st, fmt.c_str (), buf, (int)size) == 0) return L"";
+	return std::wstring (buf);
 }
 std::wstring FormatDate (const std::wstring &fmt = L"yyyy-MM-dd", const SYSTEMTIME &st = GetSystemCurrentTime ())
 {
-	size_t size = GetDateFormatW (LOCALE_USER_DEFAULT, 0, &st, NULL, NULL, 0);
-	auto buf = std::make_unique <WCHAR []> (size + 1);
-	GetDateFormatW (LOCALE_USER_DEFAULT, 0, &st, NULL, buf.get (), size);
-	return std::wstring () + buf.get ();
+	static HANDLE hHeap = HeapCreate (0, 0, 0);
+	if (!hHeap) return L"";
+	size_t size = GetDateFormatW (LOCALE_USER_DEFAULT, 0, &st, fmt.c_str (), NULL, 0);
+	if (size == 0) return L"";
+	WCHAR *buf = (WCHAR *)HeapAlloc (hHeap, HEAP_ZERO_MEMORY, sizeof (WCHAR) * (size + 1));
+	raii heapReleaser ([buf] () {
+		if (buf) HeapFree (hHeap, 0, buf);
+	});
+	if (GetDateFormatW (LOCALE_USER_DEFAULT, 0, &st, fmt.c_str (), buf, (int)size) == 0) return L"";
+	return std::wstring (buf);
 }
 CriticalSection g_cs;
 void RunTask (HWND hDlg)
 {
-	CreateScopedLock (g_cs);
+	// CreateScopedLock (g_cs);
 	HWND hList = GetDlgItem (hDlg, IDC_APPXLIST);
 	HWND hListButton [] = {
 		GetDlgItem (hDlg, IDC_ADDPKG),
@@ -1311,9 +1322,18 @@ void RunTask (HWND hDlg)
 		AppendTextToEdit (hConsole, std::wstring (c) + L"\r\n");
 		{
 			std::wstring format = GetRCStringSW (IDS_STATUS);
-			auto buf = std::make_unique <WCHAR []> (format.length () + lstrlenW (c) + 4);
-			swprintf (buf.get (), format.c_str (), std::wnstring (c).trim ().c_str ());
-			SetWindowTextW (hStatus, buf.get ());
+			static HANDLE hHeap = HeapCreate (0, 0, 0);
+			if (!hHeap) return -1;
+			size_t len = format.length () + lstrlenW (c) + 4;
+			WCHAR *buf = (WCHAR *)HeapAlloc (hHeap, HEAP_ZERO_MEMORY, sizeof (WCHAR) * len);
+			raii freeBuf ([buf] () {
+				if (buf) HeapFree (hHeap, 0, buf);
+			});
+			if (buf)
+			{
+				swprintf (buf, len, format.c_str (), std::wnstring (c).trim ().c_str ());
+				SetWindowTextW (hStatus, buf);
+			}
 		}
 		return 0;
 	});
@@ -1336,7 +1356,7 @@ void RunTask (HWND hDlg)
 			FormatTime (GetRCStringSW (IDS_TIME_FORMAT)).c_str (),
 			GetRCStringSW (IDS_TASK_END).c_str ()
 		));
-		g_pTaskbarList->SetProgressState (hDlg, TBPF_NORMAL);
+		g_pTaskbarList->SetProgressState (hDlg, TBPF_NOPROGRESS);
 	});
 	SetWindowLongPtr (hProgress, GWL_STYLE, (GetWindowLongPtr (hProgress, GWL_STYLE) & ~PBS_MARQUEE));
 	g_pTaskbarList->SetProgressState (hDlg, TBPF_NORMAL);
@@ -1462,9 +1482,18 @@ void RunTask (HWND hDlg)
 		} (hList, allitems);
 		for (auto &it : allitems)
 		{
-			auto buf = std::make_unique <WCHAR []> (it [0].length () + it [1].length () + 4);
-			PathCombineW (buf.get (), it [1].c_str (), it [0].c_str ());
-			files.push_back (buf.get ());
+			static HANDLE hHeap = HeapCreate (0, 0, 0);
+			if (!hHeap) break;
+			size_t len = it [0].length () + it [1].length () + 4;
+			WCHAR *buf = (WCHAR *)HeapAlloc (hHeap, HEAP_ZERO_MEMORY, sizeof (WCHAR) * len);
+			raii freeBuf ([buf] () {
+				if (buf) HeapFree (hHeap, 0, buf);
+			});
+			if (buf)
+			{
+				PathCombineW (buf, it [1].c_str (), it [0].c_str ());
+				files.push_back (buf);
+			}
 		}
 	}
 	std::wstring outfile = L"";
@@ -1484,21 +1513,44 @@ void RunTask (HWND hDlg)
 		g_pTaskbarList->SetProgressState (hDlg, TBPF_ERROR);
 		SendMessageW (hProgress, PBM_SETSTATE, PBST_ERROR, 0);
 		std::wstring format = GetRCStringSW (IDS_ERROR_PACKAGE);
-		auto buf = std::make_unique <WCHAR []> (format.length () + std::max (std::to_wstring (hr).length (), (size_t)16) + 4);
-		swprintf (buf.get (), format.c_str (), hr);
-		io.outputLine (buf.get ());
+		static HANDLE hHeap = HeapCreate (0, 0, 0);
+		if (!hHeap)
+		{
+			io.outputLine (L"Heap creation failed");
+			return;
+		}
+		size_t len = format.length () + std::max (std::to_wstring (hr).length (), (size_t)16) + 4;
+		WCHAR *buf = (WCHAR *)HeapAlloc (hHeap, HEAP_ZERO_MEMORY, sizeof (WCHAR) * len);
+		raii freeBuf ([buf] () {
+			if (buf) HeapFree (hHeap, 0, buf);
+		});
+		if (buf)
+		{
+			swprintf (buf, len, format.c_str (), hr);
+			io.outputLine (buf);
+		}
 		return;
 	}
 	if (autosigned)
 	{
 		std::wstring finaloutdir = GetFileDirectoryW (outfile);
-		auto finaloutfname = std::make_unique <WCHAR []> (outfile.length () + 1);
-		StrCpyW (finaloutfname.get (), PathFindFileNameW (outfile.c_str ()));
-		PathRemoveExtensionW (finaloutfname.get ());
+		static HANDLE hHeap = HeapCreate (0, 0, 0);
+		if (!hHeap)
+		{
+			io.safeOutputLine (L"HeapCreate failed");
+			return;
+		}
+		size_t fnameLen = outfile.length () + 1;
+		WCHAR* finaloutfname = (WCHAR*)HeapAlloc (hHeap, HEAP_ZERO_MEMORY, sizeof (WCHAR) * fnameLen);
+		raii freeFinaloutfname ([finaloutfname] () {
+			if (finaloutfname) HeapFree (hHeap, 0, finaloutfname);
+		});
+		StrCpyW (finaloutfname, PathFindFileNameW (outfile.c_str ()));
+		PathRemoveExtensionW (finaloutfname);
 		std::wstring publisher = GetBundlePackagePublisher (outfile);
 		std::wstring outcert, outpvk, outpfx;
 		io.safeOutputLine (GetRCStringSW (IDS_PROGRESS_MAKECERT));
-		bool res = MakeCert (publisher, finaloutdir, finaloutfname.get (), outcert, outpvk, io, hDlg);
+		bool res = MakeCert (publisher, finaloutdir, finaloutfname, outcert, outpvk, io, hDlg);
 		if (!res)
 		{
 			std::wstring errort = GetRCStringSW (IDS_ERROR_CERT);
@@ -1509,7 +1561,7 @@ void RunTask (HWND hDlg)
 			return;
 		}
 		io.safeOutputLine (GetRCStringSW (IDS_PROGRESS_PVK2PFX));
-		res = Pvk2Pfx (outcert, outpvk, finaloutdir, finaloutfname.get (), outpfx, io, hDlg);
+		res = Pvk2Pfx (outcert, outpvk, finaloutdir, finaloutfname, outpfx, io, hDlg);
 		if (!res)
 		{
 			std::wstring errort = GetRCStringSW (IDS_ERROR_PFX);
@@ -1533,9 +1585,19 @@ void RunTask (HWND hDlg)
 	}
 	{
 		std::wstring format = GetRCStringSW (IDS_SUCCESS);
-		auto buf = std::make_unique <WCHAR []> (format.length () + outfile.length () + bundlever.stringify ().length () + 4);
-		swprintf (buf.get (), format.c_str (), outfile.c_str (), bundlever.stringifyw ().c_str ());
-		io.outputLine (buf.get ());
+		static HANDLE hHeap = HeapCreate (0, 0, 0);
+		if (!hHeap)
+		{
+			io.outputLine (L"HeapCreate failed");
+			return;
+		}
+		size_t bufLen = format.length () + outfile.length () + bundlever.stringifyw ().length () + 4;
+		WCHAR *buf = (WCHAR *)HeapAlloc (hHeap, HEAP_ZERO_MEMORY, sizeof (WCHAR) * bufLen);
+		raii freeBuf ([buf] () {
+			if (buf) HeapFree (hHeap, 0, buf);
+		});
+		swprintf (buf, bufLen, format.c_str (), outfile.c_str (), bundlever.stringifyw ().c_str ());
+		io.outputLine (buf);
 	}
 }
 #define WM_ENABLE_CONTROL (WM_APP + 1)
@@ -1658,6 +1720,7 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			return TRUE;
 		} break;
 		case WM_COMMAND: {
+			static heapmgr hheap;
 			switch (LOWORD (wParam))
 			{
 				case IDCANCEL: {
@@ -1668,15 +1731,21 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					std::wstring filterdisplay = GetRCStringSW (IDS_DIALOG_APPXDESP);
 					std::wstring filtertypes = L"*.appx;*.msix";
 					size_t len = filterdisplay.capacity () + filtertypes.capacity () + 4;
-					auto filter = std::make_unique <WCHAR []> (len);
-					strcpynull (filter.get (), filterdisplay.c_str (), len);
-					strcpynull (filter.get (), filtertypes.c_str (), len);
-					auto files = ExploreFile (hDlg, filter.get (), OFN_EXPLORER | OFN_ALLOWMULTISELECT | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST, GetRCStringSW (IDS_DIALOG_ADDAPPX));
+					auto filter = hheap.alloc <WCHAR> (len);
+					raii endt ([&filter] () {
+						if (filter) hheap.free (filter);
+						filter = nullptr;
+					});
+					strcpynull (filter, filterdisplay.c_str (), len);
+					strcpynull (filter, filtertypes.c_str (), len);
+					std::vector <std::wstring> files;
+					ExploreFile (hDlg, files, filter, OFN_EXPLORER | OFN_ALLOWMULTISELECT | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST, GetRCStringSW (IDS_DIALOG_ADDAPPX));
 					switch (files.size ())
 					{
 						case 0: return FALSE;
 						case 1: {
-							auto row = GetTableRowFromPackage (files [0]);
+							std::vector <std::wstring> row;
+							GetTableRowFromPackage (files [0], row);
 							if (row.empty ())
 							{
 								std::wstring failedstr = GetRCStringSW (IDS_FILE_SINGLE_FAILED);
@@ -1723,7 +1792,8 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 							for (auto& it : files)
 							{
-								auto r = GetTableRowFromPackage (it);
+								std::vector <std::wstring> r;
+								GetTableRowFromPackage (it, r);
 								if (!r.empty ()) { rows.push_back (r); success.emplace_back (it); }
 								else failed.emplace_back (it);
 							}
@@ -1793,27 +1863,34 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 							}
 
 							MessageBoxLongStringW (hDlg, result.c_str (), GetRCStringSW (IDS_TITLE_RESULT).c_str ());
-							return TRUE;
 						}
 					}
+					SetProcessWorkingSetSize (GetCurrentProcess (), -1, -1);
+					EmptyWorkingSet (GetCurrentProcess ());
 					return TRUE;
 				} break;
 				case IDC_REMOVEPKG: {
 					HWND hList = GetDlgItem (hDlg, IDC_APPXLIST);
-					auto serials = GetListSelectedCount (hList);
+					std::vector <int64_t> serials;
+					GetListSelectedCount (hList, serials);
 					std::vector <std::wstring> filepaths;
 					filepaths.reserve (serials.size ());
 					for (auto &uit : serials)
 					{
 						std::vector <std::wstring> row;
 						GetListViewItemRow (hList, uit, row);
-						auto buf = std::make_unique <WCHAR []> (row [0].length () + row [1].length () + 4);
-						PathCombineW (buf.get (), row [1].c_str (), row [0].c_str ());
-						filepaths.push_back (buf.get ());
+						auto buf = hheap.alloc <WCHAR> (row [0].length () + row [1].length () + 4);
+						raii entd ([&buf] () {
+							if (buf) hheap.free (buf);
+							buf = nullptr;
+						});
+						PathCombineW (buf, row [1].c_str (), row [0].c_str ());
+						filepaths.push_back (buf);
 					}
 					std::wstring msg = L"";
 					msg += GetRCStringSW (IDS_ASK_REMOVE) + L"\r\n";
 					msg += AppendFilesByDirectory (filepaths);
+					EmptyWorkingSet (GetCurrentProcess ());
 					if (ConfirmBoxLongStringW (hDlg, msg, GetRCStringSW (IDS_TITLE_CONFIRM).c_str ()))
 					{
 						RemoveListViewByCount (hList, serials);
@@ -1833,22 +1910,32 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					std::wstring filterdisplay = GetRCStringSW (IDS_DIALOG_BUNDLEXML);
 					std::wstring filtertypes = L"AppxBundleManifest.xml";
 					size_t len = filterdisplay.capacity () + filtertypes.capacity () + 4;
-					auto filter = std::make_unique <WCHAR []> (len);
-					strcpynull (filter.get (), filterdisplay.c_str (), len);
-					strcpynull (filter.get (), filtertypes.c_str (), len);
-					auto xmlpaths = ExploreFile (
+					auto filter = hheap.alloc <WCHAR> (len);
+					raii endt ([&filter] () {
+						if (filter) hheap.free (filter);
+						filter = nullptr;
+					});
+					strcpynull (filter, filterdisplay.c_str (), len);
+					strcpynull (filter, filtertypes.c_str (), len);
+					std::vector <std::wstring> xmlpaths;
+					ExploreFile (
 						hDlg,
-						filter.get (),
+						xmlpaths,
+						filter,
 						OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST,
 						GetRCStringSW (IDS_DIALOG_LOADXML)
 					);
 					if (xmlpaths.size () != 1) return FALSE;
 					auto &xmlpath = xmlpaths [0];
 					if (!IsFileExists (xmlpath)) return FALSE;
-					auto bundledir = std::make_unique <WCHAR []> (xmlpath.length () + 1);
-					lstrcpyW (bundledir.get (), xmlpath.c_str ());
-					PathRemoveFileSpecW (bundledir.get ());
-					PathRemoveFileSpecW (bundledir.get ());
+					auto bundledir = hheap.alloc <WCHAR> (xmlpath.length () + 1);
+					raii endt1 ([&bundledir] () {
+						if (bundledir) hheap.free (bundledir);
+						bundledir = nullptr;
+					});
+					lstrcpyW (bundledir, xmlpath.c_str ());
+					PathRemoveFileSpecW (bundledir);
+					PathRemoveFileSpecW (bundledir);
 					pugi::xml_document doc;
 					pugi::xml_parse_result result = doc.load_file (xmlpath.c_str ());
 					if (!result)
@@ -1871,7 +1958,7 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						if (attr)
 						{
 							WCHAR buf [32767] = {0};
-							PathCombineW (buf, bundledir.get (), pugi::as_wide (attr.as_string ()).c_str ());
+							PathCombineW (buf, bundledir, pugi::as_wide (attr.as_string ()).c_str ());
 							files.push_back (buf);
 						}
 					}
@@ -1886,7 +1973,8 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 						for (auto& it : files)
 						{
-							auto r = GetTableRowFromPackage (it);
+							std::vector <std::wstring> r;
+							GetTableRowFromPackage (it, r);
 							if (!r.empty ()) { rows.push_back (r); success.emplace_back (it); }
 							else failed.emplace_back (it);
 						}
@@ -1944,7 +2032,7 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 							appendFilesByDirectory (success);
 							result += L"\r\n";
 						}
-
+						EmptyWorkingSet (GetCurrentProcess ());
 						if (!failed.empty ())
 						{
 							std::wstring title = GetRCStringSW (IDS_FILE_MULTIPLE_FAILED);
@@ -2054,7 +2142,8 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
 				KillTimer (hDlg, TIMER_DEBOUNCE_LIST);
 				HWND hList = GetDlgItem (hDlg, IDC_APPXLIST);
-				auto list = GetListSelectedCount (hList);
+				std::vector <int64_t> list;
+				GetListSelectedCount (hList, list);
 				for (auto &it : list) it++;
 				{
 					int64_t tlen = (int64_t)ListView_GetItemCount (hList);
@@ -2078,7 +2167,9 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						WCHAR path [MAX_PATH];
 						PathCombineW (path, row [1].c_str (), row [0].c_str ());
 						files.push_back (path);
-						strings.push_back (GetPackageInfoForDisplay (path));
+						std::vector <std::wnstring> inf;
+						GetPackageInfoForDisplay (path, inf);
+						strings.push_back (inf);
 					}
 					std::vector <std::wnstring> same;
 					MergeVectorsKeepSame (strings, same);
@@ -2106,7 +2197,8 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						}
 					}
 				}
-				int a = 0;
+				SetProcessWorkingSetSize (GetCurrentProcess (), -1, -1);
+				EmptyWorkingSet (GetCurrentProcess ());
 			}
 			return TRUE;
 		}
@@ -2148,6 +2240,7 @@ int APIENTRY wWinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCm
 			g_pTaskbarList = NULL;
 		}
 	});
+	SetProcessWorkingSetSize (GetCurrentProcess (), -1, -1);
 	SetupInstanceEnvironment ();
 	g_hIcon = ScopedHICON (LoadIconW (hInstance, MAKEINTRESOURCE (IDI_ICONMAIN)));
 	CoInitializeEx (NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);

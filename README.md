@@ -89,7 +89,7 @@ PRI 文件通常位于 Appx 包中，与清单同一目录，且命名为“reso
 
 <h2>在这里说明一下 AppxBundle 包版本的问题：<br>Here is an explanation of the AppxBundle package version issue:</h2>
 
-版本号的结构构成：<主版本号 (Major)>.<次版本号 (Minor)>.<构建号 (Build)>.<修订号 (Revision，这样翻译吧？)>。<br>The structure of the version number is: <Major>.<Minor>.<Build>.<Revision>.
+版本号的结构构成：&lt;主版本号 (Major)&gt;.&lt;次版本号 (Minor)&gt;.&lt;构建号 (Build)&gt;.&lt;修订号 (Revision，这样翻译吧？)&gt;。<br>The structure of the version number is: &lt;Major&gt;.&lt;Minor&gt;.&lt;Build&gt;.&lt;Revision&gt;.
 
 虽然我的 应用安装程序 是为了方便看包的版本，并没显示 AppxBundle 的版本，而是 AppxBundle 包中 Appx 的版本，方便看版本号。但实际上 AppxBundle 包的版本号与包内的 Appx 包的版本号却不是一样的。在 Windows 8.1 应用中，主版本号通常为构建时的年份（如 2014、2015 等），而在 Windows 10 中，不会以年份为主版本号，好像有一段时期又以年份为主版本号。现在不知道变成什么样子了。但在这里，我们只需知道：Win8.1 的 AppxBundle 的版本号是以年份为主版本号的。<br>Although my App Installer doesn't display the AppxBundle version, but rather the Appx version within the AppxBundle, for easier viewing, the AppxBundle version number is actually different from the Appx version number within it. In Windows 8.1, the major version number for apps was typically the year of the build (e.g., 2014, 2015, etc.). In Windows 10, this no longer uses the year as the primary version number, though it seems that for a period of time, it was used again. I'm not sure what's changed now. For now, all we need to know is that AppxBundle versions in Windows 8.1 are based on the year.
 

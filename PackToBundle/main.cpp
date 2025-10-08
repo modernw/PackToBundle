@@ -184,7 +184,6 @@ void AddListContent (
 	// 1. Deduplication: compare with both existing and new rows
 	// ----------------------------------------------------
 	std::vector<std::vector<std::wstring>> filteredData;
-	filteredData.reserve (data.size ());
 
 	for (size_t i = 0; i < data.size (); ++i)
 	{
@@ -212,7 +211,6 @@ void AddListContent (
 				for (int k = 0; k < existingCount; ++k)
 				{
 					std::vector<std::wstring> existingRow;
-					existingRow.reserve (columnCount);
 					for (size_t c = 0; c < columnCount; ++c)
 					{
 						wchar_t buf [512] = {0};
@@ -443,7 +441,6 @@ size_t GetListViewItemRow (HWND hList, int index, std::vector <std::wstring> &ro
 {
 	row.clear ();
 	int colCount = Header_GetItemCount (ListView_GetHeader (hList));
-	row.reserve (colCount);
 
 	for (int col = 0; col < colCount; ++col)
 	{
@@ -514,7 +511,6 @@ template <typename T> size_t MergeVectorsKeepSame (const std::vector <std::vecto
 	size_t min_length = 0;
 	for (auto &it : arrays) min_length = std::max (min_length, it.size ());
 	for (auto &it : arrays) min_length = std::min (min_length, it.size ());
-	result.reserve (min_length);
 	if (arrays.size () > 0)
 	{
 		for (size_t i = 0; i < min_length; i ++)
@@ -1272,7 +1268,7 @@ std::wstring FormatDate (const std::wstring &fmt = L"yyyy-MM-dd", const SYSTEMTI
 CriticalSection g_cs;
 void RunTask (HWND hDlg)
 {
-	// CreateScopedLock (g_cs);
+	CreateScopedLock (g_cs);
 	HWND hList = GetDlgItem (hDlg, IDC_APPXLIST);
 	HWND hListButton [] = {
 		GetDlgItem (hDlg, IDC_ADDPKG),
@@ -1680,6 +1676,7 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 			HWND hList = GetDlgItem (hDlg, IDC_APPXLIST);
 			InitListControl (hList, thead);
+			DragAcceptFiles (hDlg, TRUE);
 			HWND hEnablePFN = GetDlgItem (hDlg, IDC_NAME_PFN);
 			SetCheckboxState (hEnablePFN, TRUE);
 			HWND hCustomNameInput = GetDlgItem (hDlg, IDC_CUSTOM_NAME);
@@ -1786,9 +1783,6 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 							std::vector<std::vector<std::wstring>> rows;
 							std::vector<std::wnstring> failed;
 							std::vector<std::wnstring> success;
-							success.reserve (files.size () / 2 + 1);
-							failed.reserve (files.size () / 2 + 1);
-							rows.reserve (files.size ());
 
 							for (auto& it : files)
 							{
@@ -1819,7 +1813,6 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 							}, 250);
 
 							std::wstring result;
-							result.reserve (256);
 
 							auto appendFilesByDirectory = [&result] (const std::vector<std::wnstring>& files) {
 								std::map<std::wstring, std::vector<std::wstring>> dirMap;
@@ -1874,7 +1867,7 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					std::vector <int64_t> serials;
 					GetListSelectedCount (hList, serials);
 					std::vector <std::wstring> filepaths;
-					filepaths.reserve (serials.size ());
+
 					for (auto &uit : serials)
 					{
 						std::vector <std::wstring> row;
@@ -1967,9 +1960,6 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						std::vector<std::vector<std::wstring>> rows;
 						std::vector<std::wnstring> failed;
 						std::vector<std::wnstring> success;
-						success.reserve (files.size () / 2 + 1);
-						failed.reserve (files.size () / 2 + 1);
-						rows.reserve (files.size ());
 
 						for (auto& it : files)
 						{
@@ -2000,7 +1990,6 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						}, 250);
 
 						std::wstring result;
-						result.reserve (256);
 
 						auto appendFilesByDirectory = [&result] (const std::vector<std::wnstring>& files) {
 							std::map<std::wstring, std::vector<std::wstring>> dirMap;
@@ -2157,9 +2146,7 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				for (auto &it : list) it--;
 				{
 					std::vector <std::wstring> files;
-					files.reserve (8);
 					std::vector <std::vector <std::wnstring>> strings;
-					strings.reserve (8);
 					for (auto &it : list)
 					{
 						std::vector <std::wstring> row;
@@ -2227,6 +2214,88 @@ INT_PTR CALLBACK WndProc (HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			}
 			return TRUE;
 		} break;
+		case WM_DROPFILES:
+		{
+			HDROP hDrop = (HDROP)wParam;
+			WCHAR filePath [MAXSHORT] = {0};
+			UINT fileCount = DragQueryFileW (hDrop, 0xFFFFFFFF, NULL, 0); // 获取文件数量
+			std::vector <std::vector <std::wstring>> rows;
+			std::vector <std::wnstring> failed;
+			std::vector <std::wnstring> success;
+			HWND hList = GetDlgItem (hDlg, IDC_APPXLIST);
+			for (UINT i = 0; i < fileCount; i++)
+			{
+				DragQueryFileW (hDrop, i, filePath, MAX_PATH);
+				std::vector <std::wstring> r;
+				GetTableRowFromPackage (filePath, r);
+				if (!r.empty ()) { rows.push_back (r); success.push_back (filePath); }
+				else failed.push_back (filePath);
+			}
+			using tablerow = std::vector<std::wstring>;
+			AddListContent (hList, thead, rows, true,
+				[] (const tablerow& r1, const tablerow& r2) -> bool {
+				if (r1.size () > 2 && r2.size () > 2)
+				{
+					std::vector <WCHAR> path1 (r1 [0].length () + r1 [1].length () + 8, 0);
+					std::vector <WCHAR> path2 (r2 [0].length () + r2 [1].length () + 8, 0);
+					PathCombineW (path1.data (), r1 [1].c_str (), r1 [0].c_str ());
+					PathCombineW (path2.data (), r2 [1].c_str (), r2 [0].c_str ());
+					return std::wnstring::equals (std::wnstring (path1.data ()), std::wnstring (path2.data ()));
+				}
+				return false;
+			},
+				[&success, &failed] (const tablerow& tr) {
+				std::vector <WCHAR> path (tr [0].length () + tr [1].length () + 8, 0);
+				PathCombineW (path.data (), tr [1].c_str (), tr [0].c_str ());
+				success.erase (std::remove (success.begin (), success.end (), std::wnstring (path.data ())), success.end ());
+				push_unique (failed, std::wnstring (path.data ()));
+			}, 250);
+			if (failed.size ())
+			{
+				std::wstring result;
+				auto appendFilesByDirectory = [&result] (const std::vector<std::wnstring>& files) {
+					std::map<std::wstring, std::vector<std::wstring>> dirMap;
+					for (auto& fullPath : files) {
+						wchar_t dir [MAX_PATH] = {0};
+						wchar_t file [MAX_PATH] = {0};
+						wcsncpy_s (dir, fullPath.c_str (), MAX_PATH);
+						LPWSTR pFile = PathFindFileNameW (dir);
+						wcsncpy_s (file, pFile, MAX_PATH);
+						PathRemoveFileSpecW (dir);
+						dirMap [dir].emplace_back (file);
+					}
+					for (auto& pair : dirMap) {
+						result += fmt::format (GetRCStringSW (IDS_FORMAT_INDIR).c_str (), pair.first.c_str ());
+						for (auto& filename : pair.second) {
+							result += L"        " + filename + L"\r\n";
+						}
+						result += L"\r\n";
+					}
+				};
+				if (!success.empty ())
+				{
+					std::wstring title = GetRCStringSW (IDS_FILE_MULTIPLE_SUCCESS);
+					std::vector<WCHAR> lpbuf (title.length () + 64, 0);
+					swprintf (lpbuf.data (), lpbuf.size (), title.c_str (), success.size (), fileCount);
+					result += lpbuf.data ();
+					result += L"\r\n";
+					appendFilesByDirectory (success);
+					result += L"\r\n";
+				}
+				if (!failed.empty ())
+				{
+					std::wstring title = GetRCStringSW (IDS_FILE_MULTIPLE_FAILED);
+					std::vector<WCHAR> lpbuf (title.length () + 64, 0);
+					swprintf (lpbuf.data (), lpbuf.size (), title.c_str (), failed.size (), fileCount);
+					result += lpbuf.data ();
+					result += L"\r\n";
+					appendFilesByDirectory (failed);
+				}
+				MessageBoxLongStringW (hDlg, result.c_str (), GetRCStringSW (IDS_TITLE_RESULT).c_str ());
+			}
+			DragFinish (hDrop);
+			return 0;
+		}
 		break;
 	}
 	return FALSE;

@@ -12,25 +12,16 @@
 
 HRESULT GetPackageReader (_In_ LPCWSTR inputFileName, _Outptr_ IAppxPackageReader **reader)
 {
+	if (reader == NULL) return E_POINTER;
+	*reader = NULL;
 	HRESULT hr = S_OK;
-	IAppxFactory* appxFactory = NULL;
-	IStream* inputStream = NULL;
-	hr = CoCreateInstance (__uuidof(AppxFactory), NULL, CLSCTX_INPROC_SERVER, __uuidof(IAppxFactory), (LPVOID*)(&appxFactory));
-	if (SUCCEEDED (hr))
-	{
-		hr = SHCreateStreamOnFileEx (inputFileName, STGM_READ | STGM_SHARE_DENY_NONE, 0, FALSE, NULL, &inputStream);
-	}
-	if (SUCCEEDED (hr)) hr = appxFactory->CreatePackageReader (inputStream, reader);
-	if (inputStream != NULL)
-	{
-		inputStream->Release ();
-		inputStream = NULL;
-	}
-	if (appxFactory != NULL)
-	{
-		appxFactory->Release ();
-		appxFactory = NULL;
-	}
+	CComPtr <IAppxFactory> appxFactory;
+	CComPtr <IStream> inputStream;
+	hr = CoCreateInstance (__uuidof(AppxFactory), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS (&appxFactory));
+	if (FAILED (hr)) return hr;
+	hr = SHCreateStreamOnFileEx (inputFileName, STGM_READ | STGM_SHARE_DENY_NONE, 0, FALSE, NULL, &inputStream);
+	if (FAILED (hr)) return hr;
+	hr = appxFactory->CreatePackageReader (inputStream, reader);
 	return hr;
 }
 IAppxManifestReader *GetAppxManifestReader (IAppxPackageReader *reader)
@@ -69,28 +60,16 @@ IAppxManifestReader2 *GetAppxManifestReader2 (IAppxManifestReader *m)
 }
 HRESULT GetBundleReader (_In_ LPCWSTR inputFileName, _Outptr_ IAppxBundleReader** bundleReader)
 {
+	if (bundleReader == NULL) return E_POINTER;
+	*bundleReader = NULL;
 	HRESULT hr = S_OK;
-	IAppxBundleFactory* appxBundleFactory = NULL;
-	IStream* inputStream = NULL;
-	hr = CoCreateInstance (__uuidof(AppxBundleFactory), NULL, CLSCTX_INPROC_SERVER, __uuidof(IAppxBundleFactory), (LPVOID*)(&appxBundleFactory));
-	if (SUCCEEDED (hr))
-	{
-		hr = SHCreateStreamOnFileEx (inputFileName, STGM_READ | STGM_SHARE_DENY_NONE, 0, FALSE, NULL, &inputStream);
-	}
-	if (SUCCEEDED (hr))
-	{
-		hr = appxBundleFactory->CreateBundleReader (inputStream, bundleReader);
-	}
-	if (inputStream != NULL)
-	{
-		inputStream->Release ();
-		inputStream = NULL;
-	}
-	if (appxBundleFactory != NULL)
-	{
-		appxBundleFactory->Release ();
-		appxBundleFactory = NULL;
-	}
+	CComPtr <IAppxBundleFactory> appxBundleFactory;
+	CComPtr <IStream> inputStream;
+	hr = CoCreateInstance (__uuidof(AppxBundleFactory), NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS (&appxBundleFactory));
+	if (FAILED (hr)) return hr;
+	hr = SHCreateStreamOnFileEx (inputFileName, STGM_READ | STGM_SHARE_DENY_NONE, 0, FALSE, NULL, &inputStream);
+	if (FAILED (hr)) return hr;
+	hr = appxBundleFactory->CreateBundleReader (inputStream, bundleReader);
 	return hr;
 }
 enum class PackageType
@@ -111,7 +90,7 @@ struct package_info
 		void init (IAppxManifestPackageId *id)
 		{
 			if (!id) return;
-			CComPtr <IAppxManifestPackageId> pid = id;
+			IAppxManifestPackageId *pid = id;
 			LPWSTR lpstr [4] = {nullptr};
 			raii endtask ([&lpstr] () -> void {
 				for (size_t cnt = 0; cnt < 4; cnt ++)
@@ -144,8 +123,8 @@ struct package_info
 		{
 			if (!m) return;
 			{
-				CComPtr <IAppxManifestResourcesEnumerator> re = nullptr;
-				if (SUCCEEDED (m->GetResources (&re)) && re)
+				CComPtr <IAppxManifestResourcesEnumerator> re;
+				if (SUCCEEDED (m->GetResources (&re)))
 				{
 					BOOL hasCurrent = false;
 					HRESULT hr = re->GetHasCurrent (&hasCurrent);
@@ -167,15 +146,15 @@ struct package_info
 			CComPtr <IAppxManifestReader2> m2 = GetAppxManifestReader2 (m);
 			if (m2)
 			{
-				CComPtr <IAppxManifestQualifiedResourcesEnumerator> qr = nullptr;
-				if (SUCCEEDED (m2->GetQualifiedResources (&qr)) && qr)
+				CComPtr <IAppxManifestQualifiedResourcesEnumerator> qr;
+				if (SUCCEEDED (m2->GetQualifiedResources (&qr)))
 				{
 					BOOL hasCurrent = false;
 					HRESULT hr = qr->GetHasCurrent (&hasCurrent);
 					while (SUCCEEDED (hr) && hasCurrent)
 					{
-						CComPtr <IAppxManifestQualifiedResource> r = nullptr;
-						if (SUCCEEDED (qr->GetCurrent (&r)) && r)
+						CComPtr <IAppxManifestQualifiedResource> r;
+						if (SUCCEEDED (qr->GetCurrent (&r)))
 						{
 							UINT32 scale = 0;
 							if (SUCCEEDED (r->GetScale (&scale)) && scale)
@@ -201,20 +180,20 @@ struct package_info
 	{
 		is_valid = false;
 		if (!r) return;
-		CComPtr <IAppxManifestReader> m = nullptr;
+		CComPtr <IAppxManifestReader> m;
 		if (SUCCEEDED (r->GetManifest (&m)) && m)
 		{
 			{
-				CComPtr <IAppxManifestPackageId> id = nullptr;
-				if (SUCCEEDED (m->GetPackageId (&id)) && id)
+				CComPtr <IAppxManifestPackageId> id;
+				if (SUCCEEDED (m->GetPackageId (&id)))
 				{
 					this->identity.init (id);
 				}
 			}
 			this->resources.init (m);
-			CComPtr <IAppxManifestApplicationsEnumerator> a = nullptr;
+			CComPtr <IAppxManifestApplicationsEnumerator> a;
 			BOOL hasCurrent = false;
-			if (SUCCEEDED (m->GetApplications (&a)) && a && SUCCEEDED (a->GetHasCurrent (&hasCurrent)) && hasCurrent) package_type = PackageType::application;
+			if (SUCCEEDED (m->GetApplications (&a)) && SUCCEEDED (a->GetHasCurrent (&hasCurrent)) && hasCurrent) package_type = PackageType::application;
 			else package_type = PackageType::resource;
 			is_valid = true;
 		}
@@ -223,7 +202,7 @@ struct package_info
 	{
 		is_valid = false;
 		if (!IsFileExists (fp)) return;
-		CComPtr <IAppxPackageReader> p = nullptr;
+		CComPtr <IAppxPackageReader> p;
 		if (SUCCEEDED (GetPackageReader (fp.c_str (), &p)) && p)
 		{
 			init (p);
@@ -241,11 +220,11 @@ struct package_info
 std::wstring GetBundlePackageFullName (IAppxBundleReader *r)
 {
 	if (!r) return L"";
-	CComPtr <IAppxBundleManifestReader> m = nullptr;
-	if (SUCCEEDED (r->GetManifest (&m)) && m)
+	CComPtr <IAppxBundleManifestReader> m;
+	if (SUCCEEDED (r->GetManifest (&m)))
 	{
-		CComPtr <IAppxManifestPackageId> id = nullptr;
-		if (SUCCEEDED (m->GetPackageId (&id)) && id)
+		CComPtr <IAppxManifestPackageId> id;
+		if (SUCCEEDED (m->GetPackageId (&id)))
 		{
 			LPWSTR lpstr = nullptr;
 			raii endtask ([&lpstr] () {
@@ -263,8 +242,8 @@ std::wstring GetBundlePackageFullName (IAppxBundleReader *r)
 
 std::wstring GetBundlePackageFullName (const std::wstring &filepath)
 {
-	CComPtr <IAppxBundleReader> bread = nullptr;
-	if (SUCCEEDED (GetBundleReader (filepath.c_str (), &bread)) && bread)
+	CComPtr <IAppxBundleReader> bread;
+	if (SUCCEEDED (GetBundleReader (filepath.c_str (), &bread)))
 	{
 		return GetBundlePackageFullName (bread);
 	}
